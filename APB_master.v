@@ -12,12 +12,12 @@ module APB_master (
   localparam SETUP =2'b01 ;
   localparam  ACCESS=2'b10 ;
   //====================== input signals ============================
-  input pclk, prst_n, pready,pselx, transfer_type,pslverr;
+  input pclk, prst_n, pready, transfer_type,pslverr;
   input [DATA_WIDTH-1 : 0] MISO;
   input [DATA_WIDTH-1 : 0] prdata;
   input [ADDR_WIDTH -1 : 0] address;
   //====================== output sigmals ===========================
-  output penable, pwrite, error_flag;
+  output  reg penable, pwrite, error_flag,pselx;
   output  reg [ADDR_WIDTH -1 : 0] paddr;
   output  reg [DATA_WIDTH -1 : 0] MOSI;
   output  reg [DATA_WIDTH -1 : 0] pwdata;
@@ -48,13 +48,63 @@ module APB_master (
     endcase
   end
 //======================= next state kogic =======================
-always @(posedge pclk or negedge prst_n) begin
-  if(!prst_n)
-  cs<=IDLE;
-  else
-  cs<=ns;
-end
-//======================= output logic ============================
-
+  always @(posedge pclk) begin
+    if(!prst_n)
+    cs<=IDLE;
+    else
+    cs<=ns;
+  end
+  //======================= output logic ============================
+  always @(posedge pclk) begin
+    if(!prst_n)begin
+      pwdata<=0;
+      paddr<=0;
+      penable<=0;
+      pselx<=0;
+      pwrite<=0;
+      error_flag<=0;
+      MOSI<=0;
+    end
+    else begin
+      case (cs)
+        IDLE:begin
+          pwdata<=0;
+          paddr<=0;
+          penable<=0;
+          MOSI<=0;
+          pwrite<=0;
+          error_flag<=0;
+          pselx<=1;   //decoder is required if there are multiple slaves
+        end 
+        SETUP:begin
+          pwdata<=MISO;
+          paddr<=address;
+          penable<=1;
+          MOSI<=0;
+          pwrite<=transfer_type;
+          error_flag<=0;
+          pselx<=1; 
+        end 
+        ACCESS:begin
+          pwdata<=MISO;
+          paddr<=address;
+          penable<=1;
+          MOSI<=prdata;
+          pwrite<=transfer_type;
+          error_flag<=pslverr;
+          pselx<=1; 
+        end 
+        default: begin
+          pwdata<=0;
+          paddr<=0;
+          penable<=0;
+          MOSI<=0;
+          pwrite<=0;
+          error_flag<=0;
+          pselx<=1;   //decoder is required if there are multiple slaves
+        end
+      endcase
+    end
+  end
   
 endmodule
